@@ -76,15 +76,6 @@ contract RegistryTest is Test {
                 0xa95176133a52fbf43979f46c0658010c573c093f3814a5d4dded92b52d197dff
             ]
         });
-
-        /**
-         * Expected output using DST as empty string "": 0x0000000000000000000000000000000000000000000000000000000000000001
-         */
-
-        // bytes memory domainSeparator = bytes("Taiko Based Rollup Preconfirmation v0.1.0");
-        // bytes memory domainSeparator = bytes(0x0000000000000000000000000000000000000000000000000000000000000001);
-        // bytes memory domainSeparator = bytes("");
-        // bytes memory domainSeparator = hex"0000000000000000000000000000000000000000000000000000000000000001";
         bytes memory domainSeparator = hex"";
 
         require(registry.verifySignature(message, signature, pubkey, domainSeparator), "Signature verification failed");

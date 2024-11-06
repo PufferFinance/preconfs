@@ -38,10 +38,14 @@ contract Registry {
     error NotUnregistered();
     error UnregistrationDelayNotMet();
     error NoCollateralToClaim();
-
+    error FraudProofMerklePathInvalid();
+    error FraudProofChallengeInvalid();
     // Events
     event OperatorRegistered(bytes32 operatorCommitment, uint32 registeredAt);
-    event OperatorUnregistered(bytes32 operatorCommitment, uint32 unregisteredAt);
+    event OperatorUnregistered(
+        bytes32 operatorCommitment,
+        uint32 unregisteredAt
+    );
     event OperatorDeleted(bytes32 operatorCommitment, uint72 amountToReturn);
 
     function register(
@@ -116,10 +120,37 @@ contract Registry {
 
     function slashRegistration(
         bytes32 operatorCommitment,
-        bytes32[] calldata proof,
         BLS12381.G1Point calldata pubkey,
-        BLS12381.G2Point calldata signature
-    ) external {}
+        BLS12381.G2Point calldata signature,
+        bytes32 proxyKey,
+        bytes32[] calldata proof,
+        uint256 leafIndex
+    ) external {
+        Operator storage operator = commitments[operatorCommitment];
+
+        uint256[2] memory pubkeyBytes = pubkey.compress(); // compressed bls pubkey
+        uint256[8] memory signatureBytes = signature.flatten(); // flattened registration signature
+
+        // reconstruct leaf
+        bytes32 leaf = sha256(abi.encodePacked(
+            pubkeyBytes,
+            sha256(abi.encodePacked(signatureBytes, proxyKey))
+        ));
+
+        // verify proof against operatorCommitment
+        if (MerkleUtils.verifyProof(proof, operatorCommitment, leaf, leafIndex)) {
+            revert FraudProofMerklePathInvalid();
+        }
+
+        // reconstruct message todo
+        bytes memory message = bytes("");
+
+        // verify signature
+        bytes memory domainSeparator = bytes("");
+        if (verifySignature(message, signature, pubkey, domainSeparator)) {
+            revert FraudProofChallengeInvalid();
+        }
+    }
 
     function unregister(bytes32 operatorCommitment) external {
         Operator storage operator = commitments[operatorCommitment];
