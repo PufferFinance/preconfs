@@ -14,7 +14,7 @@ contract Registry {
 
     struct Operator {
         bytes32 commitmentKey; // compressed ecdsa key without prefix
-        address operator; // msg.sender can be a multisig
+        address withdrawalAddress; // msg.sender can be a multisig
         uint72 collateral; // todo save as GWEI
         uint32 registeredAt;
         uint32 unregisteredAt;
@@ -22,16 +22,12 @@ contract Registry {
         // anything else?
     }
 
-    struct Leaf {
-        uint256[2] pubkey; // compressed pubkey
-        bytes32 registrationCommitment; // sha256(signature || commitmentKey)
-    }
-
     mapping(bytes32 operatorCommitment => Operator) public commitments;
 
     // Constants
     uint256 constant MIN_COLLATERAL = 0.1 ether;
     uint256 constant TWO_EPOCHS = 64;
+    uint256 constant FRAUD_PROOF_WINDOW = 7200;
 
     // Errors
     error InsufficientCollateral();
@@ -40,6 +36,7 @@ contract Registry {
     error NotUnregistered();
     error UnregistrationDelayNotMet();
     error NoCollateralToClaim();
+    error FraudProofWindowExpired();
     error FraudProofMerklePathInvalid();
     error FraudProofChallengeInvalid();
     error UnregistrationDelayTooShort();
@@ -55,6 +52,7 @@ contract Registry {
     function register(
         Registration[] calldata registrations,
         bytes32 commitmentKey,
+        address withdrawalAddress,
         uint32 unregistrationDelay,
         uint256 height
     ) external payable {
@@ -67,7 +65,7 @@ contract Registry {
             revert UnregistrationDelayTooShort();
         }
 
-        // operatorCommitment hash = merklize registrations
+        // merklize registrations
         bytes32 operatorCommitment = createCommitment(
             registrations,
             commitmentKey,
@@ -76,7 +74,7 @@ contract Registry {
 
         // add operatorCommitment to mapping
         commitments[operatorCommitment] = Operator({
-            operator: msg.sender,
+            withdrawalAddress: withdrawalAddress,
             commitmentKey: commitmentKey,
             collateral: uint72(msg.value), // todo save as GWEI
             registeredAt: uint32(block.number),
@@ -138,6 +136,10 @@ contract Registry {
     ) external {
         Operator storage operator = commitments[operatorCommitment];
 
+        if (block.number > operator.registeredAt + FRAUD_PROOF_WINDOW) {
+            revert FraudProofWindowExpired();
+        }
+
         uint256[2] memory pubkeyBytes = pubkey.compress(); // compressed bls pubkey
         uint256[8] memory signatureBytes = signature.flatten(); // flattened registration signature
 
@@ -166,7 +168,7 @@ contract Registry {
     function unregister(bytes32 operatorCommitment) external {
         Operator storage operator = commitments[operatorCommitment];
 
-        if (operator.operator != msg.sender) {
+        if (operator.withdrawalAddress != msg.sender) {
             revert WrongOperator();
         }
 
@@ -202,7 +204,7 @@ contract Registry {
         uint72 amountToReturn = operator.collateral;
 
         // TODO safe transfer for rentrancy
-        (bool success, ) = msg.sender.call{value: amountToReturn}("");
+        (bool success, ) = operator.withdrawalAddress.call{value: amountToReturn}("");
         require(success, "Transfer failed");
 
         emit OperatorDeleted(operatorCommitment, amountToReturn);
