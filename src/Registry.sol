@@ -18,6 +18,7 @@ contract Registry {
         uint72 collateral; // todo save as GWEI
         uint32 registeredAt;
         uint32 unregisteredAt;
+        uint32 unregistrationDelay;
         // anything else?
     }
 
@@ -30,7 +31,7 @@ contract Registry {
 
     // Constants
     uint256 constant MIN_COLLATERAL = 0.1 ether;
-    uint256 constant TWO_EPOCHS = 64; // parameterize when you join
+    uint256 constant TWO_EPOCHS = 64;
 
     // Errors
     error InsufficientCollateral();
@@ -41,6 +42,8 @@ contract Registry {
     error NoCollateralToClaim();
     error FraudProofMerklePathInvalid();
     error FraudProofChallengeInvalid();
+    error UnregistrationDelayTooShort();
+
     // Events
     event OperatorRegistered(bytes32 operatorCommitment, uint32 registeredAt);
     event OperatorUnregistered(
@@ -52,11 +55,16 @@ contract Registry {
     function register(
         Registration[] calldata registrations,
         bytes32 commitmentKey,
+        uint32 unregistrationDelay,
         uint256 height
     ) external payable {
         // check collateral
         if (msg.value < MIN_COLLATERAL) {
             revert InsufficientCollateral();
+        }
+
+        if (unregistrationDelay < TWO_EPOCHS) {
+            revert UnregistrationDelayTooShort();
         }
 
         // operatorCommitment hash = merklize registrations
@@ -72,6 +80,7 @@ contract Registry {
             commitmentKey: commitmentKey,
             collateral: uint72(msg.value), // todo save as GWEI
             registeredAt: uint32(block.number),
+            unregistrationDelay: unregistrationDelay,
             unregisteredAt: 0
         });
 
@@ -181,7 +190,7 @@ contract Registry {
         }
 
         // Check that enough time has passed
-        if (block.number < operator.unregisteredAt + TWO_EPOCHS) {
+        if (block.number < operator.unregisteredAt + operator.unregistrationDelay) {
             revert UnregistrationDelayNotMet();
         }
 
