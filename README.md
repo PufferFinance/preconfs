@@ -15,12 +15,11 @@
 - [X] Rename `proxyKey` to `commitmentKey`.
 - [X] ~~Optimistically accept an `OperatorCommitment` hash. It can be proven as fraudulent by generating the merkle tree in the fraud proof.~~
 - [X] Make the unregistration delay parameterizable by the proposer but requires it to be at least `TWO_EPOCHS`.
-- [ ] Successful challenger gets to claim the collateral (how much?).
-- [ ] Spec out the `Registration` message signed by a Validator BLS key. 
+- [X] Spec out the `Registration` message signed by a Validator BLS key.
+- [X] Diagram the registration process
+- [ ] Successful challenger gets to claim the collateral (how much?). 
 - [ ] Make sure no one can overwrite an `OperatorCommitment`
 - [ ] Save the `Operator.collateral` as GWEI.
-- [ ] Diagram the registration process
-- [ ] Add field to `Operator` struct to signal if they are a gateway (open for discussion).
 
 
 
@@ -132,4 +131,23 @@ function slashRegistration(
     bytes32[] calldata proof,
     uint256 leafIndex
 ) external view;
+```
+
+```mermaid
+sequenceDiagram
+autonumber
+    participant Challenger
+    participant URC
+    participant Operator
+
+    
+    Operator->>URC: register()
+	  URC->>Challenger: events
+	  Challenger->>Challenger: verify BLS off-chain
+	  Challenger->>Challenger: detect fraud
+	  Challenger->>Challenger: generate merkle proof
+    Challenger->>URC: challenge()
+    URC->>URC: verify merkle proof
+    URC->>URC: verify BLS signature
+    URC->>Challenger: transfer reward
 ```
