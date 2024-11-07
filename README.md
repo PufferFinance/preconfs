@@ -4,7 +4,8 @@
 
 [Registry.sol](src/Registry.sol)
 - [x] Reduce `MIN_COLLATERAL` to 0.1 ETH. It needs to be non-zero to incentivize people to slash bad registrations.
-- [ ] Optimistically accept an `OperatorCommitment` hash. It can be proven as fraudulent by generating the merkle tree in the fraud proof.
+- [ ] Rename `proxyKey` to `commitmentKey`.
+- [ ] ~~Optimistically accept an `OperatorCommitment` hash. It can be proven as fraudulent by generating the merkle tree in the fraud proof.~~
 - [ ] Make the unregistration delay parameterizable by the proposer but requires it to be at least `TWO_EPOCHS`.
 - [ ] Spec out the `Registration` message signed by a Validator BLS key. 
 - [ ] Make sure no one can overwrite an `OperatorCommitment`
@@ -14,10 +15,11 @@
 
 
 [BytecodeSlasher.sol](src/BytecodeSlasher.sol)
-- [ ] Update the `BytecodeSlasher` interface to include the slashing evidence, signed bytecode, operator commitment, proxy key, and function selector.
+- [x] If we want to support 'stateful' slashing contracts we should consider signing `slasherAddress || functionSelector` and invoking that instead of deploying and executing bytecode.
+- [ ] Replace BytecodeSlasher concept with a way to call a `Slasher` contract address. 
+- [ ] Update the `Slasher` interface to include the slashing evidence, signed bytecode, operator commitment, proxy key, and function selector.
 - [ ] Any additional modifiers needed? 
-- [ ] Verify the `Delegation` signature inside the `BytecodeSlasher` 
-- [ ] If we want to support 'stateful' slashing contracts we should consider signing `slasherAddress || functionSelector` and invoking that instead of deploying and executing bytecode.
+- [ ] Verify the `Commitment` signature inside the `Slasher` 
 
 
 ## Schemas
