@@ -16,34 +16,6 @@ contract RegistryTest is Test {
         vm.deal(operator, 100 ether); // Give operator some ETH
     }
 
-    // function testRegisterMinimumCollateral() public {
-    //     vm.startPrank(operator);
-        
-    //     Registration[] memory registrations = new Registration[](1);
-    //     registrations[0] = Registration({
-    //         pubkey: [uint256(1), uint256(2)], // Mock pubkey
-    //         signature: [uint256(1), uint256(2), uint256(3), uint256(4), 
-    //                    uint256(5), uint256(6), uint256(7), uint256(8)] // Mock signature
-    //     });
-        
-    //     bytes32 proxyKey = bytes32(uint256(1)); // Mock proxy key
-        
-    //     registry.register{value: 1 ether}(registrations, proxyKey, 1); // height=1 means 2 leaves
-    //     vm.stopPrank();
-    // }
-
-    // function testRegisterInsufficientCollateral() public {
-    //     vm.startPrank(operator);
-        
-    //     Registration[] memory registrations = new Registration[](1);
-    //     bytes32 proxyKey = bytes32(uint256(1));
-        
-    //     vm.expectRevert(Registry.InsufficientCollateral.selector);
-    //     registry.register{value: 0.9 ether}(registrations, proxyKey, 1);
-        
-    //     vm.stopPrank();
-    // }
-
     function testVerifyBLS() public view {
         bytes memory message = bytes("Hello, World!");
 
