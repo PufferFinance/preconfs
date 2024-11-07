@@ -14,12 +14,11 @@ contract Registry {
 
     struct Operator {
         bytes32 commitmentKey; // compressed ecdsa key without prefix
-        address withdrawalAddress; // msg.sender can be a multisig
-        uint72 collateral; // todo save as GWEI
-        uint32 registeredAt;
-        uint32 unregisteredAt;
-        uint32 unregistrationDelay;
-        // anything else?
+        address withdrawalAddress; // can be a multisig or same as commitment key
+        uint56 collateral; // amount in gwei
+        uint32 registeredAt; // block number 
+        uint32 unregisteredAt; // block number
+        uint16 unregistrationDelay; // block number 
     }
 
     mapping(bytes32 operatorCommitment => Operator) public commitments;
@@ -53,7 +52,7 @@ contract Registry {
         Registration[] calldata registrations,
         bytes32 commitmentKey,
         address withdrawalAddress,
-        uint32 unregistrationDelay,
+        uint16 unregistrationDelay,
         uint256 height
     ) external payable {
         // check collateral
@@ -76,7 +75,7 @@ contract Registry {
         commitments[operatorCommitment] = Operator({
             withdrawalAddress: withdrawalAddress,
             commitmentKey: commitmentKey,
-            collateral: uint72(msg.value), // todo save as GWEI
+            collateral: uint56(msg.value), // todo save as GWEI
             registeredAt: uint32(block.number),
             unregistrationDelay: unregistrationDelay,
             unregisteredAt: 0
@@ -89,7 +88,7 @@ contract Registry {
         Registration[] calldata registrations,
         bytes32 commitmentKey,
         uint256 height
-    ) internal view returns (bytes32 operatorCommitment) {
+    ) internal pure returns (bytes32 operatorCommitment) {
         uint256 batchSize = 1 << height; // guaranteed pow of 2
         require(
             registrations.length <= batchSize,
@@ -133,7 +132,7 @@ contract Registry {
         bytes32 commitmentKey,
         bytes32[] calldata proof,
         uint256 leafIndex
-    ) external {
+    ) external view {
         Operator storage operator = commitments[operatorCommitment];
 
         if (block.number > operator.registeredAt + FRAUD_PROOF_WINDOW) {

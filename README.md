@@ -1,5 +1,13 @@
 # preconfs
 
+## Milestones
+- [X] Batch register an operator (cheaply)
+- [X] Unregister/Claim collateral
+- [X] Slash with bytecode
+- [ ] Slash with `Slasher` contract address
+- [ ] Social consensus?
+- [ ] ERC?
+
 ## TODOs
 
 [Registry.sol](src/Registry.sol)
@@ -7,6 +15,7 @@
 - [X] Rename `proxyKey` to `commitmentKey`.
 - [X] ~~Optimistically accept an `OperatorCommitment` hash. It can be proven as fraudulent by generating the merkle tree in the fraud proof.~~
 - [X] Make the unregistration delay parameterizable by the proposer but requires it to be at least `TWO_EPOCHS`.
+- [ ] Successful challenger gets to claim the collateral (how much?).
 - [ ] Spec out the `Registration` message signed by a Validator BLS key. 
 - [ ] Make sure no one can overwrite an `OperatorCommitment`
 - [ ] Save the `Operator.collateral` as GWEI.
@@ -21,13 +30,14 @@
 - [ ] Update the `Slasher` interface to include the slashing evidence, signed bytecode, operator commitment, proxy key, and function selector.
 - [ ] Any additional modifiers needed? 
 - [ ] Verify the `Commitment` signature inside the `Slasher` 
+- [ ] Successful challenger gets to claim the collateral (how much?).
 
 
 ## Schemas
 ```
 struct RegistrationMessage {
     // compressed ECDSA key without prefix used to sign `Delegation` messages
-    bytes32 proxyKey; 
+    bytes32 commitmentKey; 
 
     // the address that can unregister and claim collateral
     address operator; 
@@ -38,17 +48,12 @@ struct RegistrationMessage {
 ```
 
 ```
-class Delegation(Container):
-    validator_pubkey: BLSPubkey
-    delegatee_pubkey: BLSPubkey
-    bytecode_hash: Bytes
-    metadata: Bytes
 struct RegistrationMessage {
     // Validator's compressed BLS public key
     bytes validatorPubkey; 
 
     // Key used to sign this container
-    bytes32 proxyKey; 
+    bytes32 commitmentKey; 
 
     // Hash of the slashing bytecode to be executed
     bytes32 bytecodeHash;
@@ -58,3 +63,73 @@ struct RegistrationMessage {
 }
 ```
 
+## Optimistic Registration Process
+The Optimistic Registration system allows validators to register for proposer commitment services with minimal upfront verification, while maintaining security through a fraud-proof window. 
+
+### Off-Chain Preparation
+For each validator to register, the operator signs a `RegistrationMessage` with their validator's BLS key. This action binds the validator key to a `commitmentKey` (ECDSA) used to sign off-chain proposer commitments. They also select a `withdrawalAddress` that can unregister and claim collateral. The `withdrawalAddress` wallet does not interact with the preconf supply chain and can be in cold storage or a multisig.
+
+```solidity
+struct RegistrationMessage {
+    bytes32 commitmentKey;
+    address withdrawalAddress;
+    uint16 unregistrationDelay;
+}
+```
+
+### register()
+```solidity
+function register(
+    Registration[] calldata registrations,
+    bytes32 commitmentKey,
+    address withdrawalAddress,
+    uint16 unregistrationDelay,
+    uint256 height
+) external payable;
+```
+
+The operator supplies at least `MIN_COLLATERAL` Ether to the contract and batch registers the N validators. To save gas, the contract will not verify the signatures of the `Registration` messages. Instead, the function will merkleize the inputs to a root hash called the `OperatorCommitment`. This is mapped to an `Operator` struct containing the minimal required fields at just two storage slots.
+
+```solidity
+struct Operator {
+    bytes32 commitmentKey; // compressed ecdsa key without prefix
+    address withdrawalAddress; // can be a multisig or same as commitment key
+    uint56 collateral; // amount in gwei
+    uint32 registeredAt; // block number 
+    uint32 unregisteredAt; // block number
+    uint16 unregistrationDelay; // block number 
+}
+```
+
+```mermaid
+sequenceDiagram
+autonumber
+    participant Validator
+    participant Operator
+    participant URC
+    
+    Operator->>Validator: Request N Registration signatures
+    Validator->>Validator: Sign with validator BLS key
+    Validator->>Operator: N Registration signatures
+
+    Operator->>URC: register(registrations, commitmentKey, unregistrationDelay) + send ETH
+    URC->>URC: Verify collateral ≥ MIN_COLLATERAL and unregistrationDelay ≥ TWO_EPOCHS
+    URC->>URC: Merkelize Registrations to form OperatorCommitment hash
+    URC->>URC: Store OperatorCommitment => Operator mapping
+```
+
+### slashRegistration()
+After registration, a fraud proof window opens during which anyone can challenge invalid registrations. Fraud occurs if a validator BLS signature did not sign over the `commitmentKey`, `withdrawalAddress`, and `unregistrationDelay` submitted during registration. To prove fraud, the challenger first provides a merkle proof to show the `signature` is part of the `OperatorCommitment` merkle tree. Then the `signature` is verified using the on-chain BLS precompiles. 
+
+If the fraud window expires without a successful challenge, the operator would be eligible to be considered by preconf protocols.
+
+```solidity
+function slashRegistration(
+    bytes32 operatorCommitment,
+    BLS12381.G1Point calldata pubkey,
+    BLS12381.G2Point calldata signature,
+    bytes32 commitmentKey,
+    bytes32[] calldata proof,
+    uint256 leafIndex
+) external view;
+```
