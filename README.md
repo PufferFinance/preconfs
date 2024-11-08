@@ -151,3 +151,16 @@ autonumber
     URC->>URC: verify BLS signature
     URC->>Challenger: transfer reward
 ```
+
+## Slasher
+To opt-in to preconfs, operators will commit to slashing conditions by signing and distributing messages off-chain with their `commitmentKey`. To support general slashing logic, the initial idea was to have operators commit to a bytecode hash. Upon slashing, the URC would deploy and execute the bytecode. The return value of the function call is the number of GWEI to be slashed.
+
+This approach has the following drawbacks:
+- Executing bytecode requires deploying it which eats into the gas limit.
+- The approach cannot be used for stateful slashing logic, e.g., fraud proofs.
+
+To address these drawbacks, we replace commitments to bytecode with commitments to arbitrary `Slasher` contract addresses. To slash an operator, anyone can call `slash(bytes inputs)` on their committed slasher contract (each slasher contract is expected to implement this interface). Similarly, the return value of the function call is the number of GWEI to be slashed.
+
+This approach has the following benefits:
+- Each `Slasher` contract only needs to be deployed once and can be verified on-chain.
+- Arbitrary stateful logic can be executed on the `Slasher`. (e.g., a fraud proof game is played ahead of time and then calling `slash(bytes inputs)` returns the slashing outcome)
