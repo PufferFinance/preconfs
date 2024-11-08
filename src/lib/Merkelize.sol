@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Credit https://github.com/NethermindEth/Taiko-Preconf-AVS/blob/master/SmartContracts/src/libraries/MerkleUtils.sol
 
 pragma solidity >=0.8.0 <0.9.0;
 

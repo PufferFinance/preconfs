@@ -11,6 +11,7 @@ evm_version = "cancun" # is live on mainnet
 seed = "0x1337"
 solc = "0.8.25"
 # via_ir = true
+alphanet = true
 
 [fmt]
 line_length = 120
